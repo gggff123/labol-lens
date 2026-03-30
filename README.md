@@ -10,4 +10,4 @@ TO USE THIS
 ```text
  streamlit run app.py
 ```
-please ⭐ the repo if you liked it .
+please ⭐ the repo if you liked it and also support : https://pollinations.ai/.
