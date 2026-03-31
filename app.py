@@ -2,6 +2,7 @@ import requests
 import streamlit as st
 import time
 import os
+import base64
 from urllib.parse import quote
 
 st.title("🔍 Image Gen Search (BYOP)")
@@ -53,23 +54,6 @@ def get_token():
     return None
 
 # -----------------------
-# UPLOAD IMAGE TO POLLINATIONS
-# -----------------------
-def upload_image(image_bytes, filename, token):
-    res = requests.post(
-        "https://gen.pollinations.ai/image/upload",
-        headers={"Authorization": f"Bearer {token}"},
-        files={"file": (filename, image_bytes)}
-    )
-    if res.status_code == 200:
-        data = res.json()
-        # Returns hosted URL like https://media.pollinations.ai/c2b5a7ea1329cc6c
-        return data.get("url")
-    else:
-        st.error(f"❌ Upload failed ({res.status_code}): {res.text}")
-        return None
-
-# -----------------------
 # UI
 # -----------------------
 token = get_token()
@@ -99,41 +83,42 @@ with tab2:
 describe_btn = st.button("🧠 Describe Image")
 
 # -----------------------
-# STEP 1: RESOLVE IMAGE URL
+# STEP 1: RESOLVE IMAGE
 # -----------------------
 if describe_btn and token:
     auth_headers = {"Authorization": f"Bearer {token}"}
-    hosted_url = None
+    image_param = None
+    preview_image = None
 
     if uploaded_file:
-        with st.spinner("⬆️ Uploading image to Pollinations..."):
-            hosted_url = upload_image(uploaded_file.getvalue(), uploaded_file.name, token)
-        if hosted_url:
-            st.success(f"✅ Uploaded: {hosted_url}")
+        # Convert to base64 data URL — no upload endpoint needed
+        mime = uploaded_file.type  # e.g. image/jpeg
+        b64 = base64.b64encode(uploaded_file.getvalue()).decode("utf-8")
+        image_param = f"data:{mime};base64,{b64}"
+        preview_image = uploaded_file.getvalue()
 
     elif pasted_url:
-        # Use the pasted URL directly — if it's already a web URL Pollinations can fetch it
-        hosted_url = pasted_url
+        image_param = pasted_url
+        preview_image = pasted_url
 
     else:
         st.warning("⚠️ Please upload an image or paste a URL first.")
         st.stop()
 
-    if hosted_url:
-        # -----------------------
-        # STEP 2: DESCRIBE
-        # -----------------------
-        with st.spinner("🧠 Describing image..."):
-            prompt = "describe this image in detail"
-            api_url = f"https://gen.pollinations.ai/text/{quote(prompt)}?model=gemini-fast&image={quote(hosted_url)}&key={APP_KEY}"
-            res = requests.get(api_url, headers=auth_headers)
+    # -----------------------
+    # STEP 2: DESCRIBE
+    # -----------------------
+    with st.spinner("🧠 Describing image..."):
+        prompt = "describe this image in detail"
+        api_url = f"https://gen.pollinations.ai/text/{quote(prompt)}?model=gemini-fast&image={quote(image_param)}&key={APP_KEY}"
+        res = requests.get(api_url, headers=auth_headers)
 
-        if res.status_code != 200:
-            st.error(f"❌ Description failed ({res.status_code}): {res.text}")
-            st.stop()
+    if res.status_code != 200:
+        st.error(f"❌ Description failed ({res.status_code}): {res.text}")
+        st.stop()
 
-        st.session_state["description"] = res.text
-        st.session_state["hosted_url"] = hosted_url
+    st.session_state["description"] = res.text
+    st.session_state["preview_image"] = preview_image
 
 # -----------------------
 # SHOW DESCRIPTION + GENERATE
@@ -141,8 +126,7 @@ if describe_btn and token:
 if "description" in st.session_state:
     col1, col2 = st.columns(2)
     with col1:
-        if "hosted_url" in st.session_state:
-            st.image(st.session_state["hosted_url"], caption="Input Image")
+        st.image(st.session_state["preview_image"], caption="Input Image")
     with col2:
         st.write("🧠 **Description:**")
         st.write(st.session_state["description"])
