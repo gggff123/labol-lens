@@ -56,11 +56,19 @@ def get_token():
 # UI
 # -----------------------
 token = get_token()
+
 if not token:
     if st.button("🔑 Login with Pollinations"):
         token = login()
 else:
-    st.success("Using saved login ✅")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.success("Using saved login ✅")
+    with col2:
+        if st.button("🗑️ Clear API Key"):
+            os.remove(TOKEN_FILE)
+            st.info("API key cleared. Please log in again.")
+            st.rerun()
 
 image_url = st.text_input("🔗 Paste image URL", placeholder="https://example.com/image.jpg")
 btn = st.button("Generate")
@@ -82,7 +90,6 @@ if image_url and btn and token:
             headers=auth_headers
         )
 
-    # Check for auth or API error before proceeding
     if res.status_code != 200:
         st.error(f"❌ Description failed ({res.status_code}): {res.text}")
         st.stop()
@@ -103,7 +110,6 @@ if image_url and btn and token:
             headers=auth_headers
         )
 
-    # Check response is actually an image before rendering
     content_type = img_res.headers.get("Content-Type", "")
     if img_res.status_code != 200 or "image" not in content_type:
         st.error(f"❌ Image generation failed ({img_res.status_code}): {img_res.text}")
