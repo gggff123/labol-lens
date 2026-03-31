@@ -2,11 +2,12 @@ import requests
 import streamlit as st
 import time
 import os
+from urllib.parse import quote
 
 st.title("🔍 Image Gen Search (BYOP)")
 st.write("Paste an image URL → AI describes it → generates a new one")
 
-APP_KEY = "pk_yourkey"  # optional but recommended
+APP_KEY = "pk_yourkey"
 TOKEN_FILE = "token.txt"
 
 # -----------------------
@@ -68,30 +69,44 @@ btn = st.button("Generate")
 # MAIN LOGIC
 # -----------------------
 if image_url and btn and token:
-    # Step 1: Image → Text using official GET format
-    # URL: https://gen.pollinations.ai/text/your-prompt-here?model=gemini-fast&image={image}&key=YOUR_API_KEY
+    auth_headers = {"Authorization": f"Bearer {token}"}
+
+    # Step 1: Image → Text
     with st.spinner("🧠 Describing image..."):
         res = requests.get(
             "https://gen.pollinations.ai/text/describe this image in detail",
             params={
                 "model": "gemini-fast",
                 "image": image_url,
-                "key": APP_KEY
-            }
+            },
+            headers=auth_headers
         )
-        description = res.text
+
+    # Check for auth or API error before proceeding
+    if res.status_code != 200:
+        st.error(f"❌ Description failed ({res.status_code}): {res.text}")
+        st.stop()
+
+    description = res.text
     st.write("🧠 Description:", description)
 
     # Step 2: Text → Image
     with st.spinner("🎨 Generating image..."):
         img_res = requests.get(
-            f"https://gen.pollinations.ai/image/{requests.utils.quote(description)}",
+            f"https://gen.pollinations.ai/image/{quote(description)}",
             params={
                 "model": "flux",
                 "width": 1024,
                 "height": 1024,
                 "seed": 0,
-                "key": APP_KEY
-            }
+            },
+            headers=auth_headers
         )
+
+    # Check response is actually an image before rendering
+    content_type = img_res.headers.get("Content-Type", "")
+    if img_res.status_code != 200 or "image" not in content_type:
+        st.error(f"❌ Image generation failed ({img_res.status_code}): {img_res.text}")
+        st.stop()
+
     st.image(img_res.content)
