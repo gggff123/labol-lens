@@ -84,7 +84,7 @@ if im_inp and btn and token:
 
     # Step 1: Image → Text
     res = requests.post(
-        "https://gen.pollinations.ai/text/describe?model=polly",
+        "https://gen.pollinations.ai/text/describe?model=gemini-fast",
         headers={"Authorization": f"Bearer {token}"},
         files=files
     )
